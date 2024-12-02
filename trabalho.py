@@ -4,12 +4,13 @@ import math
 
 def Perspective(fov, aspect, near, far):
     f = 1 / np.tan((fov) / 2)
-    range_inv = 1 / (near - far)
+    a1 = -(far + near) / (far - near)
+    a2 = -2.0 * far * near / (far - near)
 
     return np.array([
         [f / aspect, 0,  0,                             0],
         [0,          f,  0,                             0],
-        [0,          0,  (near + far) * range_inv,      2 * near * far * range_inv],
+        [0,          0,  a1,                           a2],
         [0,          0, -1.0,                             0]
     ])
 
@@ -48,6 +49,9 @@ def RotateY(angle):
 def Vec4(x, y, z, w):
     return np.array([[x],[y],[z],[w]])
 
+def Vec3(x, y, z):
+    return Vec4(x, y, z, 1.0)
+
 def ApplyProjection(arr):
     x = arr[0][0]
     y = arr[1][0]
@@ -77,17 +81,13 @@ class App:
         self.canvas.pack()
         self.running = True
         self.current_time = 0
-
-        self.points = [Vec4(0.5, 0.0, -0.35, 1.0), Vec4(-0.5, 0.0, -0.35, 1.0), Vec4(0.0, 0.5, 0.35, 1.0), Vec4(0.0, -0.5, 0.35, 1.0)]
-
+        
+        self.points = []
         self.lines = []
-        self.screen_matrix = Transform(self.width / 2, self.height / 2, 0) @ Scale(self.width, self.height, 0)
-        self.perspective_matrix = Perspective(math.pi / 4, self.width / self.height, 0.01, 100.0)
+        self.buildCube()
 
-        for i in self.points:
-            for j in self.points:
-                if not np.array_equal(i, j):
-                    self.lines.append(Line(self.canvas, i, j))
+        self.screen_matrix = Transform(self.width / 2, self.height / 2, 0) @ Scale(self.width / 2, self.height / 2, 0)
+        self.perspective_matrix = Perspective(math.pi / 3, self.width / self.height, 1.00, 100.0)
 
         self.start()
 
@@ -96,10 +96,31 @@ class App:
             return
 
         for i in self.lines:
-            i.update(self.canvas, self.screen_matrix, self.perspective_matrix, Transform(0, 0, -10.0) @ RotateX(self.current_time) @ RotateY(self.current_time))
+            i.update(self.canvas, self.screen_matrix, self.perspective_matrix, Transform(0, 0, -5.0) @ RotateX(self.current_time) @ RotateY(self.current_time))
 
         self.current_time += 0.001 * self.delta_ms
         self.canvas.after(self.delta_ms, self.update)
+
+    def buildCube(self):
+        self.points = [
+                Vec3(-0.5, -0.5, -0.5), Vec3(+0.5, -0.5, -0.5), Vec3(+0.5, +0.5, -0.5), Vec3(-0.5, +0.5, -0.5),
+                Vec3(-0.5, -0.5, +0.5), Vec3(+0.5, -0.5, +0.5), Vec3(+0.5, +0.5, +0.5), Vec3(-0.5, +0.5, +0.5)
+                ]
+        self.lines = []
+
+        for i in list(range(4)):
+            self.lines.append(Line(self.canvas, self.points[i], self.points[(i + 1) % 4]))
+            self.lines.append(Line(self.canvas, self.points[i + 4], self.points[(i + 1) % 4 + 4]))
+            self.lines.append(Line(self.canvas, self.points[i], self.points[i + 4]))
+
+    def buildTetrahedron(self):
+        self.points = [Vec4(0.5, 0.0, -0.35, 1.0), Vec4(-0.5, 0.0, -0.35, 1.0), Vec4(0.0, 0.5, 0.35, 1.0), Vec4(0.0, -0.5, 0.35, 1.0)]
+
+        for i in self.points:
+            for j in self.points:
+                if not np.array_equal(i, j):
+                    self.lines.append(Line(self.canvas, i, j))
+
 
     def start(self):
         self.update()
